@@ -22,7 +22,14 @@ namespace TempProj
                 int command = InputHelper.GetCommand(3);
                 if (command == 3) return;
                 CreditApp app = command == 1 ? new AdminApp(connection) : new ClientApp(connection);
-                if (!InputHelper.Repeater(app.Login)) continue;
+                while (!app.Login())
+                {
+                    InputHelper.WriteComands("Повторить попытку", "Вернуться в главное меню");
+                    command = InputHelper.GetCommand(2) == 2 ? 0 : 1;
+                    if (command == 0)
+                        break;
+                }
+                if (command == 0) continue;
                 Console.ForegroundColor = ConsoleColor.Green;
                 System.Console.WriteLine("Вход выполнен успешно");
                 while (true)
@@ -32,9 +39,9 @@ namespace TempProj
                     if (command == 4) break;
                     bool isFinished = command switch
                     {
-                        1 => InputHelper.Repeater(app.FirstAction),
-                        2 => InputHelper.Repeater(app.SecondAction),
-                        _ => InputHelper.Repeater(app.ThirdAction)
+                        1 => app.FirstAction(),
+                        2 => app.SecondAction(),
+                        _ => app.ThirdAction()
                     };
                     if (isFinished)
                     {
@@ -47,8 +54,8 @@ namespace TempProj
                         System.Console.WriteLine("Операция не была завершена корректно...");
                     }
                     Console.ResetColor();
-                    System.Console.WriteLine("Нажмите любую клавишу чтобы вернуться в главное меню...");
-                    Console.Read();
+                    System.Console.WriteLine("Нажмите Enter чтобы вернуться в главное меню...");
+                    Console.ReadLine();
                 }
             }
         }
@@ -80,17 +87,6 @@ namespace TempProj
             }
             Console.ResetColor();
         }
-        public static bool Repeater(Func<bool> func)
-        {
-            while (!func())
-            {
-                WriteComands("Повторить попытку", "Вернуться в главное меню");
-                if (GetCommand(2) == 2)
-                    return false;
-                Console.Clear();
-            }
-            return true;
-        }
         public static void FillParamsSql(SqlCommand command, params string[] sqlParams)
         {
             for (int i = 0; i < sqlParams.Length; i++)
@@ -118,9 +114,11 @@ namespace TempProj
             Table table = new Table("Дата", "Тело Кредита", "Проценты", "Платеж", "Остаток");
             table.AddRaw(date.ToString("d"), creditBody.ToString(), "0", "0", summ.ToString());
             summ -= creditBody;
-            decimal percents = summ * 0.12m;
-            for (int i = 1; i <= months; i++, summ -= creditBody, percents = summ * 0.12m)
+            decimal percents = summ * (0.12m / months);
+            for (int i = 1; i <= months; i++, summ -= creditBody, percents = summ * (0.12m / months))
                 table.AddRaw(date.AddMonths(i).ToString("d"), creditBody.ToString(), percents.ToString(), (percents + creditBody).ToString(), summ.ToString());
+            Console.ForegroundColor = ConsoleColor.Blue;
+            System.Console.WriteLine($"Срок кредита : {months}\nПроцентная ставка годовых : 12%");
             table.ShowTable();
         }
         protected bool CheckID(int id, string table, string condition)
@@ -129,7 +127,7 @@ namespace TempProj
             try
             {
                 SqlCommand command = new SqlCommand(query, connection);
-                int temp = (int)command.ExecuteScalar();
+                int temp = command.ExecuteScalar() as int? ?? 0;
                 if (temp < 1)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -152,11 +150,12 @@ namespace TempProj
             System.Console.Write("Пароль : ");
             string password = Console.ReadLine();
             string userType = this is AdminApp ? "Admin" : "Client";
-            string query = $"select min(ID) from Users where Type='{userType}' and Phone='{login}' and Password='{password}'";
+            string query = "select min(ID) from Users where Type=@0 and Phone=@1 and Password=@2";
             try
             {
                 SqlCommand command = new SqlCommand(query, connection);
-                userID = (int)command.ExecuteScalar();
+                InputHelper.FillParamsSql(command, userType, login, password);
+                userID = command.ExecuteScalar() as int? ?? 0;
                 if (userID < 1)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -183,15 +182,13 @@ namespace TempProj
         public AdminApp(SqlConnection connection) => this.connection = connection;
         public void ShowClients(bool hasForm)
         {
-            string query = $"select ID,Phone,Password,FirstName,SurName,MiddleName,BirthDate,Addres{(hasForm ? ",Creditibility" : "")} from Users where Type='Client'";
+            string query = $"select ID,Phone,Password,FirstName,SurName,MiddleName,BirthDate,Addres{(hasForm ? ",Creditibility" : "")} from Users where Type='Client' and Creditibility is {(hasForm ? "not" : "")} null";
             SqlCommand command = new SqlCommand(query, connection);
             using (SqlDataReader reader = command.ExecuteReader())
             {
                 Table table = hasForm ? new("ID", "Телефон", "Пароль", "Имя", "Фамилия", "Отчество", "День Рождения", "Аддрес", "Кред.Баллы") : new("ID", "Телефон", "Пароль", "Имя", "Фамилия", "Отчество", "День Рождения", "Аддрес");
                 while (reader.Read())
-                {
                     table.AddRaw(InputHelper.ParamsToString(reader, 6));
-                }
                 table.ShowTable();
             }
         }
@@ -319,7 +316,7 @@ namespace TempProj
                 SqlCommand command = new SqlCommand($"select top 1 Creditibility from Users where ID={clientID}", connection);
                 creditibility = (int)command.ExecuteScalar();
                 command.CommandText = $"select count(*) from Credits where UserID={clientID} and Status=1";
-                countCredits = (int)command.ExecuteScalar();
+                countCredits = command.ExecuteScalar() as int? ?? 0;
                 if (countCredits > 0)
                 {
                     command.CommandText = "select sum(Delays) from Credits where UserID={clientID} and Status=1";
@@ -331,7 +328,7 @@ namespace TempProj
                 System.Console.WriteLine($"Exception : {ex.Message}");
                 return false;
             }
-            decimal perCent = profit * period / summ;
+            decimal perCent = summ / (profit * period);
             creditibility += perCent < 0.8m ? 4 : perCent < 1.5m ? 3 : perCent < 2.5m ? 2 : 1;
             creditibility += countCredits < 1 ? 0 : countCredits < 3 ? 2 : 3;
             creditibility += delays < 4 ? 0 : delays < 5 ? -1 : delays < 8 ? -2 : -3;
@@ -372,6 +369,35 @@ namespace TempProj
                     System.Console.WriteLine("Кредит с 12% годовыми был успешно оформлен\nГрафик погашения кредита :");
                     CreditGraph(summ, DateTime.Now, period);
                 }
+                transaction.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                System.Console.WriteLine($"Exception : {ex.Message}");
+                return false;
+            }
+        }
+    }
+    class ClientApp : CreditApp
+    {
+        private int creditID;
+        public ClientApp(SqlConnection connection) => this.connection = connection;
+        public override void ShowComands() => InputHelper.WriteComands("Просмотреть историю заявок", "Просмотреть остаток кредитов", "Показать детали кредита в виде графика погашения", "Вернуться к выбору пользователя");
+        public override bool FirstAction()
+        {
+            string query = $"select ID,Date,Summ,Target,Period,Status from CreditApps where UserID={userID}";
+            try
+            {
+                SqlCommand command = new SqlCommand(query, connection);
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    Table table = new Table("ID", "Дата", "Сумма", "Цель", "Срок", "Результат");
+                    while (reader.Read())
+                        table.AddRaw(InputHelper.ParamsToString(reader, 1));
+                    table.ShowTable();
+                }
                 return true;
             }
             catch (Exception ex)
@@ -380,24 +406,55 @@ namespace TempProj
                 return false;
             }
         }
-    }
-    class ClientApp : CreditApp
-    {
-        public ClientApp(SqlConnection connection) => this.connection = connection;
-        public override void ShowComands() => InputHelper.WriteComands("Просмотреть историю заявок", "Просмотреть остаток кредитов", "Показать детали кредита в виде графика погашения", "Вернуться к выбору пользователя");
-        public override bool FirstAction()
-        {
-            throw new NotImplementedException();
-        }
-
         public override bool SecondAction()
         {
-            throw new NotImplementedException();
+            string query = $"select ID,UpdatedDate,Balance,Delays from Credits where UserID={userID} and Balance<>0";
+            try
+            {
+                SqlCommand command = new SqlCommand(query, connection);
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    Table table = new Table("ID", "Дата Обновления", "Остаток", "Задержки");
+                    while (reader.Read())
+                        table.AddRaw(InputHelper.ParamsToString(reader, 1));
+                    table.ShowTable();
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"Exception : {ex.Message}");
+                return false;
+            }
         }
-
         public override bool ThirdAction()
         {
-            throw new NotImplementedException();
+            System.Console.WriteLine("Введите ID кредита, график погашения которого хотите получить : ");
+            SecondAction();
+            InputHelper.GetInput(out creditID);
+            if (!CheckID(creditID, "Credits", $"UserID={userID} and Balance<>0"))
+                return false;
+            string query = $"select AppID from Credits where ID={creditID}";
+            try
+            {
+                SqlCommand command = new SqlCommand(query, connection);
+                int AppId = (int)command.ExecuteScalar();
+                command.CommandText = $"select Summ,Date,Period from CreditApps where ID={AppId}";
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    reader.Read();
+                    decimal summ = (decimal)reader[0];
+                    DateTime date = (DateTime)reader[1];
+                    int period = (int)reader[2];
+                    CreditGraph(summ, date, period);
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"Exception : {ex.Message}");
+                return false;
+            }
         }
     }
     class Table
