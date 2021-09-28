@@ -110,12 +110,12 @@ namespace TempProj
         protected SqlConnection connection;
         public void CreditGraph(decimal summ, DateTime date, int months)
         {
-            decimal creditBody = summ / months;
+            decimal creditBody = Math.Round(summ / months, 2);
             Table table = new Table("Дата", "Тело Кредита", "Проценты", "Платеж", "Остаток");
             table.AddRaw(date.ToString("d"), creditBody.ToString(), "0", "0", summ.ToString());
             summ -= creditBody;
-            decimal percents = summ * (0.12m / months);
-            for (int i = 1; i <= months; i++, summ -= creditBody, percents = summ * (0.12m / months))
+            decimal percents = Math.Round(summ * (0.12m / months), 2);
+            for (int i = 1; i <= months; i++, summ -= creditBody, percents = Math.Round(summ * (0.12m / months), 2))
                 table.AddRaw(date.AddMonths(i).ToString("d"), creditBody.ToString(), percents.ToString(), (percents + creditBody).ToString(), summ.ToString());
             Console.ForegroundColor = ConsoleColor.Blue;
             System.Console.WriteLine($"Срок кредита : {months}\nПроцентная ставка годовых : 12%");
