@@ -319,7 +319,7 @@ namespace TempProj
                 countCredits = command.ExecuteScalar() as int? ?? 0;
                 if (countCredits > 0)
                 {
-                    command.CommandText = "select sum(Delays) from Credits where UserID={clientID} and Status=1";
+                    command.CommandText = $"select sum(Delays) from Credits where UserID={clientID} and Status=1";
                     delays = (int)command.ExecuteScalar();
                 }
             }
