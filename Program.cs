@@ -289,12 +289,12 @@ namespace TempProj
             if (!CheckID(clientID, "Users", "Creditibility is not Null"))
                 return false;
             System.Console.WriteLine("Введите сумму кредита : ");
-            bool checkSumm = decimal.TryParse(Console.ReadLine(), out decimal summ);
+            decimal.TryParse(Console.ReadLine(), out decimal summ);
             System.Console.WriteLine("Введите общий ежемесячный доход клиента : ");
-            bool checkProfit = decimal.TryParse(Console.ReadLine(), out decimal profit);
+            decimal.TryParse(Console.ReadLine(), out decimal profit);
             System.Console.WriteLine("Введите срок кредита : ");
-            bool checkPeriod = int.TryParse(Console.ReadLine(), out int period);
-            if (!checkSumm || !checkProfit || !checkPeriod)
+            int.TryParse(Console.ReadLine(), out int period);
+            if (summ <= 0 || profit <= 0 || period <= 0)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 System.Console.WriteLine("Неправильно введенные данные");
@@ -509,8 +509,8 @@ namespace TempProj
         private int Sum()
         {
             int sum = 0;
-            for (int i = 0; i < cols; maxLRaw[i]++, i++)
-                sum += maxLRaw[i];
+            for (int i = 0; i < cols; i++)
+                sum += ++maxLRaw[i];
             return sum;
         }
     }
