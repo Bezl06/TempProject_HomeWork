@@ -288,11 +288,11 @@ namespace TempProj
             InputHelper.GetInput(out clientID);
             if (!CheckID(clientID, "Users", "Creditibility is not Null"))
                 return false;
-            System.Console.WriteLine("Введите сумму кредита : ");
+            System.Console.Write("Введите сумму кредита : ");
             decimal.TryParse(Console.ReadLine(), out decimal summ);
-            System.Console.WriteLine("Введите общий ежемесячный доход клиента : ");
+            System.Console.Write("Введите общий ежемесячный доход клиента : ");
             decimal.TryParse(Console.ReadLine(), out decimal profit);
-            System.Console.WriteLine("Введите срок кредита : ");
+            System.Console.Write("Введите срок кредита : ");
             int.TryParse(Console.ReadLine(), out int period);
             if (summ <= 0 || profit <= 0 || period <= 0)
             {
